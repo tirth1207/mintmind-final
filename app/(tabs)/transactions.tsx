@@ -44,7 +44,9 @@ export default function TransactionsScreen() {
     deleteTransaction, 
     monthlyIncome, 
     monthlyExpenses,
-    getRemainingBudget 
+    getRemainingBudget,
+    // 🆕 NEW INTELLIGENCE
+    getTransactionInsight,
   } = useTransactions();
   const { settings } = useAppState();
   const colors = Colors[settings.theme];
@@ -157,7 +159,11 @@ export default function TransactionsScreen() {
         {Object.entries(groupedTransactions).map(([dateKey, items]) => (
           <View key={dateKey} style={styles.dateGroup}>
             <Text style={[styles.dateHeader, { color: colors.textSecondary }]}>{dateKey}</Text>
-            {items.map((transaction) => (
+            {items.map((transaction) => {
+              // 🆕 GET TRANSACTION INSIGHT
+              const insight = transaction.type === 'expense' ? getTransactionInsight(transaction.id) : null;
+              
+              return (
               <TouchableOpacity
                 key={transaction.id}
                 onLongPress={() => {
@@ -197,6 +203,38 @@ export default function TransactionsScreen() {
                           {transaction.note}
                         </Text>
                       ) : null}
+                      
+                      {/* 🆕 SHOW TRANSACTION INSIGHT */}
+                      {insight && (
+                        <View style={styles.insightContainer}>
+                          {insight.predictiveAlert && (
+                            <Text style={[styles.insightPredictive, { color: colors.warning }]}>
+                              {insight.predictiveAlert}
+                            </Text>
+                          )}
+                          {insight.warningMessage && (
+                            <Text style={[styles.insightWarning, { color: colors.error }]}>
+                              {insight.warningMessage}
+                            </Text>
+                          )}
+                          {insight.shouldSkip && (
+                            <Text style={[styles.insightSuggestion, { color: colors.error }]}>
+                              💡 Consider skipping this expense
+                            </Text>
+                          )}
+                          <Text style={[styles.insightMoment, { color: colors.textSecondary }]}>
+                            📊 {insight.momentAnalysis}
+                          </Text>
+                          <View style={styles.insightRow}>
+                            <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>
+                              💾 Savings Index: {insight.savingsIndex}/10
+                            </Text>
+                            <Text style={[styles.insightImpact, { color: insight.monthEndImpact > 0 ? colors.success : colors.error }]}>
+                              Impact: {insight.monthEndImpact > 0 ? '+' : ''}₹{insight.monthEndImpact.toLocaleString('en-IN')}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
                     <Text
                       style={[
@@ -212,7 +250,8 @@ export default function TransactionsScreen() {
                   </View>
                 </Card>
               </TouchableOpacity>
-            ))}
+            );
+            })}
           </View>
         ))}
 
@@ -655,6 +694,44 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  insightContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  insightPredictive: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    marginBottom: 4,
+  },
+  insightWarning: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    marginBottom: 4,
+  },
+  insightSuggestion: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    marginBottom: 4,
+  },
+  insightMoment: {
+    fontSize: 11,
+    marginBottom: 6,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  insightLabel: {
+    fontSize: 11,
+    fontWeight: '500' as const,
+  },
+  insightImpact: {
+    fontSize: 11,
     fontWeight: '600' as const,
   },
 });

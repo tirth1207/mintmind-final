@@ -6,7 +6,7 @@ import { calculateMaxEMI } from '@/lib/finance/emi';
 import { calculateSIP } from '@/lib/finance/sip';
 import { useAppState } from '@/store/AppStateProvider';
 import { useTransactions } from '@/store/TransactionProvider';
-import { AlertTriangle, PiggyBank, Target, Wallet } from 'lucide-react-native';
+import { AlertTriangle, PiggyBank, Target, Wallet, Zap, TrendingDown } from 'lucide-react-native';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -21,6 +21,9 @@ export default function DashboardScreen() {
     burnRate,
     projectedMonthEnd,
     getRemainingBudget,
+    // 🆕 NEW INTELLIGENCE IMPORTS
+    categoryHealthScores,
+    financialInsights,
   } = useTransactions();
   const colors = Colors[settings.theme];
 
@@ -161,6 +164,100 @@ export default function DashboardScreen() {
             color={colors.accent}
           />
         </View>
+
+        {/* 🆕 SMART FINANCIAL INSIGHTS SUMMARY */}
+        {financialInsights && (
+          <Card style={[styles.card, { backgroundColor: colors.primary + '08', borderColor: colors.primary }]}>
+            <View style={styles.insightHeader}>
+              <Zap size={20} color={colors.primary} />
+              <Text style={[styles.insightTitle, { color: colors.primary }]}>Smart Insights</Text>
+            </View>
+            
+            <View style={styles.insightGrid}>
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>Savings Potential</Text>
+                <Text style={[styles.insightValue, { color: colors.success }]}>
+                  ₹{financialInsights.totalSavingsPotential.toLocaleString('en-IN')}
+                </Text>
+              </View>
+
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>Projection Accuracy</Text>
+                <Text style={[styles.insightValue, { color: colors.primary }]}>
+                  {financialInsights.projectionAccuracy}%
+                </Text>
+              </View>
+
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightLabel, { color: colors.textSecondary }]}>Risk Categories</Text>
+                <Text style={[styles.insightValue, { color: financialInsights.highRiskCategories.length > 0 ? colors.warning : colors.success }]}>
+                  {financialInsights.highRiskCategories.length}
+                </Text>
+              </View>
+            </View>
+
+            {financialInsights.behaviorAlert && (
+              <View style={[styles.alertBox, { backgroundColor: colors.warningLight, borderColor: colors.warning }]}>
+                <AlertTriangle size={16} color={colors.warning} />
+                <Text style={[styles.alertText, { color: colors.warning }]}>
+                  {financialInsights.behaviorAlert}
+                </Text>
+              </View>
+            )}
+
+            {financialInsights.recommendedActions.length > 0 && (
+              <View style={styles.actionsContainer}>
+                <Text style={[styles.actionsTitle, { color: colors.text }]}>Recommended Actions</Text>
+                {financialInsights.recommendedActions.slice(0, 2).map((action, idx) => (
+                  <Text key={idx} style={[styles.actionItem, { color: colors.textSecondary }]}>
+                    • {action}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </Card>
+        )}
+
+        {/* 🆕 CATEGORY HEALTH SCORES */}
+        {categoryHealthScores.length > 0 && (
+          <Card style={styles.card}>
+            <View style={styles.insightHeader}>
+              <TrendingDown size={20} color={colors.primary} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Category Health</Text>
+            </View>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+              Overspending detection per category
+            </Text>
+
+            <View style={styles.categoryHealthList}>
+              {categoryHealthScores.slice(0, 4).map((cat) => (
+                <View key={cat.category} style={[styles.categoryHealthItem, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+                  <View style={styles.categoryHealthName}>
+                    <Text style={[styles.categoryHealthLabel, { color: colors.text }]}>
+                      {cat.category}
+                    </Text>
+                    <Text style={[styles.categoryHealthStatus, { 
+                      color: cat.status === 'critical' ? colors.error : cat.status === 'warning' ? colors.warning : colors.success 
+                    }]}>
+                      {cat.percentage.toFixed(1)}%
+                    </Text>
+                  </View>
+                  <View style={styles.categoryHealthBar}>
+                    <View style={[styles.categoryHealthBarFill, { 
+                      width: `${Math.min(100, cat.percentage)}%`,
+                      backgroundColor: cat.status === 'critical' ? colors.error : cat.status === 'warning' ? colors.warning : colors.success
+                    }]} />
+                  </View>
+                  {cat.overspendAmount > 0 && (
+                    <Text style={[styles.overspendText, { color: colors.error }]}>
+                      ₹{cat.overspendAmount.toLocaleString('en-IN')} over
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
 
         {/* 🆕 PROJECTED MONTH-END BALANCE */}
         {monthlyIncome > 0 && (
@@ -555,4 +652,28 @@ const styles = StyleSheet.create({
   budgetFlowLabel: { fontSize: 13, fontWeight: '500', marginBottom: 4 },
   budgetFlowValue: { fontSize: 20, fontWeight: '700' },
   budgetFlowSeparator: { height: 2, width: 30, alignSelf: 'center', marginVertical: 4 },
+
+  // 🆕 SMART INSIGHTS STYLES
+  insightHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
+  insightTitle: { fontSize: 16, fontWeight: '700' },
+  insightGrid: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  insightItem: { flex: 1, alignItems: 'center' },
+  insightLabel: { fontSize: 11, marginBottom: 4 },
+  insightValue: { fontSize: 18, fontWeight: '700' },
+  
+  alertBox: { borderRadius: 8, padding: 12, marginBottom: 12, flexDirection: 'row', gap: 8, borderWidth: 1 },
+  alertText: { flex: 1, fontSize: 12, fontWeight: '500' },
+  
+  actionsContainer: { marginTop: 12 },
+  actionsTitle: { fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  actionItem: { fontSize: 12, marginBottom: 4 },
+
+  categoryHealthList: { gap: 12 },
+  categoryHealthItem: { paddingBottom: 12 },
+  categoryHealthName: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  categoryHealthLabel: { fontSize: 13, fontWeight: '600' },
+  categoryHealthStatus: { fontSize: 13, fontWeight: '700' },
+  categoryHealthBar: { height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' },
+  categoryHealthBarFill: { height: '100%', borderRadius: 3 },
+  overspendText: { fontSize: 11, marginTop: 4, fontWeight: '600' },
 });
