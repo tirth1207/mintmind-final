@@ -44,6 +44,29 @@ export function StatCard({ title, value, subtitle, icon, color }: StatCardProps)
 }
 
 const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  icon: {
+    marginRight: 6,
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  value: {
+    fontSize: 26,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+  },
   card: {
     borderRadius: 16,
     padding: 16,

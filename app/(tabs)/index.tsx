@@ -1,5 +1,5 @@
 import { BarChart } from '@/components/BarChart';
-import { Card, StatCard } from '@/components/Card';
+import { Card, StatCard, GlassCard } from '@/components/Card';
 import { PieChart } from '@/components/PieChart';
 import Colors from '@/constants/colors';
 import { calculateMaxEMI } from '@/lib/finance/emi';
