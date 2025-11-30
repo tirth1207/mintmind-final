@@ -132,6 +132,19 @@ export default function OnboardingScreen() {
               keyboardType="numeric"
               prefix="₹"
             />
+
+            {/* Show automatic savings calculation */}
+            {formData.monthlyIncome && formData.monthlyExpenses && (
+              <View style={[styles.savingsBox, { backgroundColor: colors.successLight, borderColor: colors.success }]}>
+                <Text style={[styles.savingsLabel, { color: colors.success }]}>Automatic Savings</Text>
+                <Text style={[styles.savingsValue, { color: colors.success }]}>
+                  ₹{Math.max(0, parseInt(formData.monthlyIncome) - parseInt(formData.monthlyExpenses)).toLocaleString('en-IN')}/month
+                </Text>
+                <Text style={[styles.savingsHint, { color: colors.textSecondary }]}>
+                  This amount will be used for SIP & investments
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -281,6 +294,27 @@ const styles = StyleSheet.create({
   stepDescription: {
     fontSize: 14,
     marginBottom: 24,
+  },
+  savingsBox: {
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 16,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  savingsLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    marginBottom: 8,
+  },
+  savingsValue: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    marginBottom: 8,
+  },
+  savingsHint: {
+    fontSize: 12,
+    textAlign: 'center' as const,
   },
   label: {
     fontSize: 14,

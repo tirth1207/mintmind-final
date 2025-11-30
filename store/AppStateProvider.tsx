@@ -100,6 +100,11 @@ export const [AppStateProvider, useAppState] = createContextHook(() => {
     return userProfile.monthlyIncome - userProfile.monthlyExpenses;
   }, [userProfile.monthlyIncome, userProfile.monthlyExpenses]);
 
+  const plannedSavings = useMemo<number>(() => {
+    // Savings = Income - Expenses
+    return Math.max(0, userProfile.monthlyIncome - userProfile.monthlyExpenses);
+  }, [userProfile.monthlyIncome, userProfile.monthlyExpenses]);
+
   return {
     userProfile,
     settings,
@@ -107,6 +112,7 @@ export const [AppStateProvider, useAppState] = createContextHook(() => {
     budget,
     recommendedSIP,
     monthlySurplus,
+    plannedSavings,
     updateUserProfile,
     updateSettings,
     resetData,

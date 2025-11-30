@@ -193,7 +193,43 @@ export default function DashboardScreen() {
 
         {/* Real-Time Budget Status */}
         {remaining && budget && (
-          <Card style={styles.card}>
+          <>
+            {/* Planned Budget Overview */}
+            <Card style={[styles.card, { backgroundColor: colors.primary + '08', borderColor: colors.primary }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Your Planned Budget</Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+                Income - Expenses = Savings for SIP & Investments
+              </Text>
+
+              <View style={[styles.budgetFlowBox, { backgroundColor: colors.card }]}>
+                <View style={styles.budgetFlowItem}>
+                  <Text style={[styles.budgetFlowLabel, { color: colors.textSecondary }]}>Monthly Income</Text>
+                  <Text style={[styles.budgetFlowValue, { color: colors.primary }]}>
+                    ₹{userProfile.monthlyIncome.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+
+                <View style={[styles.budgetFlowSeparator, { backgroundColor: colors.textSecondary }]} />
+
+                <View style={styles.budgetFlowItem}>
+                  <Text style={[styles.budgetFlowLabel, { color: colors.textSecondary }]}>Monthly Expenses (Limit)</Text>
+                  <Text style={[styles.budgetFlowValue, { color: colors.error }]}>
+                    ₹{userProfile.monthlyExpenses.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+
+                <View style={[styles.budgetFlowSeparator, { backgroundColor: colors.textSecondary }]} />
+
+                <View style={styles.budgetFlowItem}>
+                  <Text style={[styles.budgetFlowLabel, { color: colors.success, fontWeight: '700' }]}>Monthly Savings (SIP)</Text>
+                  <Text style={[styles.budgetFlowValue, { color: colors.success, fontSize: 24 }]}>
+                    ₹{userProfile.monthlyIncome - userProfile.monthlyExpenses > 0 ? (userProfile.monthlyIncome - userProfile.monthlyExpenses).toLocaleString('en-IN') : '0'}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            <Card style={styles.card}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>Smart Daily Budget</Text>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
               Based on your 50-30-20 rule budget
@@ -270,6 +306,7 @@ export default function DashboardScreen() {
               </View>
             </View>
           </Card>
+          </>
         )}
 
         {/* 7-Day Expenses */}
@@ -512,4 +549,10 @@ const styles = StyleSheet.create({
   limitItem: { flex: 1, alignItems: 'center' },
   limitLabel: { fontSize: 12, marginBottom: 4 },
   limitValue: { fontSize: 16, fontWeight: '700' },
+
+  budgetFlowBox: { borderRadius: 12, padding: 16, marginBottom: 16 },
+  budgetFlowItem: { alignItems: 'center', paddingVertical: 8 },
+  budgetFlowLabel: { fontSize: 13, fontWeight: '500', marginBottom: 4 },
+  budgetFlowValue: { fontSize: 20, fontWeight: '700' },
+  budgetFlowSeparator: { height: 2, width: 30, alignSelf: 'center', marginVertical: 4 },
 });
