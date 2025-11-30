@@ -1,29 +1,43 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useAppState } from '@/store/AppStateProvider';
-import { useTransactions, useRemainingBudget } from '@/store/TransactionProvider';
+import { BarChart } from '@/components/BarChart';
 import { Card, StatCard } from '@/components/Card';
 import { PieChart } from '@/components/PieChart';
-import { BarChart } from '@/components/BarChart';
-import { TrendingUp, Wallet, Target, PiggyBank, AlertTriangle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
-import { calculateSIP } from '@/lib/finance/sip';
 import { calculateMaxEMI } from '@/lib/finance/emi';
+import { calculateSIP } from '@/lib/finance/sip';
+import { useAppState } from '@/store/AppStateProvider';
+import { useTransactions } from '@/store/TransactionProvider';
+import { AlertTriangle, PiggyBank, Target, Wallet } from 'lucide-react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function DashboardScreen() {
-  const { userProfile, budget, recommendedSIP, monthlySurplus, settings } = useAppState();
-  const { expenseCategoryBreakdown, dailyExpenseData } = useTransactions();
+  const { userProfile, budget, recommendedSIP, settings } = useAppState();
+  const {
+    expenseCategoryBreakdown,
+    dailyExpenseData,
+    monthlyIncome,
+    monthlyExpenses,
+    remainingMonthlyBudget,
+    burnRate,
+    projectedMonthEnd,
+    getRemainingBudget,
+  } = useTransactions();
   const colors = Colors[settings.theme];
-
-  const dailyLimit = budget?.dailyLimit || 0;
-  const weeklyLimit = budget?.weeklyLimit || 0;
-  const monthlyLimit = budget?.monthlyLimit || 0;
-  const remaining = useRemainingBudget(dailyLimit, weeklyLimit, monthlyLimit);
 
   if (!userProfile.hasCompletedOnboarding) return null;
 
-  const projectionData = calculateSIP(recommendedSIP, 12, 5);
-  const maxEMI = calculateMaxEMI(userProfile.monthlyIncome);
+  // 🆕 Get real budget status with limits
+  const remaining = getRemainingBudget(
+    budget?.dailyLimit || 0,
+    budget?.weeklyLimit || 0,
+    budget?.monthlyLimit || 0
+  );
+
+  const maxEMI = calculateMaxEMI(monthlyIncome);
+  
+  // Use recommended SIP or budget savings (20% of income) for projection
+  const sipAmount = recommendedSIP > 0 ? recommendedSIP : (budget?.savings || 0);
+  const projectionData = calculateSIP(sipAmount, 12, 5);
 
   const budgetChartData = budget
     ? [
@@ -33,77 +47,109 @@ export default function DashboardScreen() {
       ]
     : [];
 
+  // 🆕 Determine alert status
+  const hasOverspentDaily = remaining.dailyRemaining < 0;
+  const hasOverspentWeekly = remaining.weeklyRemaining < 0 && !hasOverspentDaily;
+  const hasOverspentMonthly = remaining.monthlyRemaining < 0 && !hasOverspentDaily && !hasOverspentWeekly;
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Your Dashboard</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Financial overview at a glance
+            Real-time financial overview
           </Text>
         </View>
 
-        {/* Alerts */}
-        {remaining && (
-          <>
-            {remaining.dailyRemaining < 0 && (
-              <Card style={[styles.alertCard, { backgroundColor: colors.errorLight, borderColor: colors.error }]}>
-                <View style={styles.alertContent}>
-                  <AlertTriangle size={20} color={colors.error} />
-                  <View style={styles.alertText}>
-                    <Text style={[styles.alertTitle, { color: colors.error }]}>
-                      Daily Budget Exceeded
-                    </Text>
-                    <Text style={[styles.alertMessage, { color: colors.error }]}>
-                      You overspent by ₹{Math.abs(remaining.dailyRemaining).toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-            )}
-
-            {remaining.weeklyRemaining < 0 && remaining.dailyRemaining >= 0 && (
-              <Card style={[styles.alertCard, { backgroundColor: colors.errorLight, borderColor: colors.error }]}>
-                <View style={styles.alertContent}>
-                  <AlertTriangle size={20} color={colors.error} />
-                  <View style={styles.alertText}>
-                    <Text style={[styles.alertTitle, { color: colors.error }]}>
-                      Weekly Budget Exceeded
-                    </Text>
-                    <Text style={[styles.alertMessage, { color: colors.error }]}>
-                      You overspent by ₹{Math.abs(remaining.weeklyRemaining).toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-            )}
-          </>
+        {/* 🆕 OVERSPEND ALERTS */}
+        {hasOverspentDaily && (
+          <Card style={[styles.alertCard, { backgroundColor: colors.errorLight, borderColor: colors.error }]}>
+            <View style={styles.alertContent}>
+              <AlertTriangle size={20} color={colors.error} />
+              <View style={styles.alertText}>
+                <Text style={[styles.alertTitle, { color: colors.error }]}>
+                  Daily Budget Exceeded
+                </Text>
+                <Text style={[styles.alertMessage, { color: colors.error }]}>
+                  You overspent by ₹{Math.abs(remaining.dailyRemaining).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+          </Card>
         )}
 
-        {/* Income + Surplus */}
+        {hasOverspentWeekly && (
+          <Card style={[styles.alertCard, { backgroundColor: colors.errorLight, borderColor: colors.error }]}>
+            <View style={styles.alertContent}>
+              <AlertTriangle size={20} color={colors.error} />
+              <View style={styles.alertText}>
+                <Text style={[styles.alertTitle, { color: colors.error }]}>
+                  Weekly Budget Exceeded
+                </Text>
+                <Text style={[styles.alertMessage, { color: colors.error }]}>
+                  You overspent by ₹{Math.abs(remaining.weeklyRemaining).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
+        {hasOverspentMonthly && (
+          <Card style={[styles.alertCard, { backgroundColor: colors.errorLight, borderColor: colors.error }]}>
+            <View style={styles.alertContent}>
+              <AlertTriangle size={20} color={colors.error} />
+              <View style={styles.alertText}>
+                <Text style={[styles.alertTitle, { color: colors.error }]}>
+                  Monthly Budget Exceeded
+                </Text>
+                <Text style={[styles.alertMessage, { color: colors.error }]}>
+                  You overspent by ₹{Math.abs(remaining.monthlyRemaining).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
+        {/* 🆕 KEY STATS - NOW FROM REAL TRANSACTIONS */}
         <View style={styles.statsRow}>
           <StatCard
             title="Monthly Income"
-            value={`₹${userProfile.monthlyIncome.toLocaleString('en-IN')}`}
+            value={`₹${monthlyIncome.toLocaleString('en-IN')}`}
             icon={<Wallet size={20} color={colors.primary} />}
             color={colors.text}
           />
           <StatCard
-            title="Surplus"
-            value={`₹${monthlySurplus.toLocaleString('en-IN')}`}
-            icon={<TrendingUp size={20} color={colors.success} />}
-            color={monthlySurplus > 0 ? colors.success : colors.error}
+            title="Monthly Spent"
+            value={`₹${monthlyExpenses.toLocaleString('en-IN')}`}
+            icon={<Wallet size={20} color={colors.error} />}
+            color={monthlyExpenses > 0 ? colors.error : colors.text}
           />
         </View>
 
-        {/* SIP + EMI */}
+        <View style={styles.statsRow}>
+          <StatCard
+            title="Remaining"
+            value={`₹${remainingMonthlyBudget.toLocaleString('en-IN')}`}
+            subtitle={`Balance this month`}
+            icon={<PiggyBank size={20} color={colors.primary} />}
+            color={remainingMonthlyBudget >= 0 ? colors.success : colors.error}
+          />
+          <StatCard
+            title="Burn Rate"
+            value={`₹${burnRate.toLocaleString('en-IN')}`}
+            subtitle="Avg daily spend"
+            icon={<AlertTriangle size={20} color={colors.warning} />}
+            color={colors.warning}
+          />
+        </View>
+
         <View style={styles.statsRow}>
           <StatCard
             title="Recommended SIP"
-            value={`₹${recommendedSIP.toLocaleString('en-IN')}`}
-            subtitle="Monthly"
+            value={`₹${(recommendedSIP > 0 ? recommendedSIP : (budget?.savings || 0)).toLocaleString('en-IN')}`}
+            subtitle={recommendedSIP > 0 ? "Based on surplus" : "20% of income"}
             icon={<Target size={20} color={colors.secondary} />}
             color={colors.secondary}
           />
@@ -116,45 +162,110 @@ export default function DashboardScreen() {
           />
         </View>
 
-        {/* Budget Status */}
-        {remaining && (
-          <Card style={styles.card}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Real-Time Budget Status</Text>
+        {/* 🆕 PROJECTED MONTH-END BALANCE */}
+        {monthlyIncome > 0 && (
+          <Card style={[styles.card, { borderColor: projectedMonthEnd >= 0 ? colors.successLight : colors.errorLight }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Month-End Projection</Text>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
-              Track your spending against limits
+              Based on current burn rate of ₹{burnRate.toLocaleString('en-IN')}/day
             </Text>
 
-            <View style={styles.budgetStatusContainer}>
-              {/* Day */}
-              <View style={styles.budgetStatusItem}>
-                <Text style={[styles.budgetStatusLabel, { color: colors.textSecondary }]}>Today</Text>
-                <Text style={[styles.budgetStatusValue, { color: remaining.dailyRemaining >= 0 ? colors.success : colors.error }]}>
-                  ₹{remaining.dailyRemaining.toLocaleString('en-IN')}
+            <View style={styles.projectionBox}>
+              <Text style={[styles.projectionLabel, { color: colors.textSecondary }]}>
+                Projected Balance at Month End
+              </Text>
+              <Text
+                style={[
+                  styles.projectionValueLarge,
+                  { color: projectedMonthEnd >= 0 ? colors.success : colors.error },
+                ]}
+              >
+                ₹{projectedMonthEnd.toLocaleString('en-IN')}
+              </Text>
+              <Text style={[styles.projectionHint, { color: colors.textSecondary }]}>
+                {projectedMonthEnd >= 0
+                  ? `You'll save ₹${Math.abs(projectedMonthEnd).toLocaleString('en-IN')} if spending continues as usual`
+                  : `You may overspend by ₹${Math.abs(projectedMonthEnd).toLocaleString('en-IN')} if spending continues as usual`}
+              </Text>
+            </View>
+          </Card>
+        )}
+
+        {/* Real-Time Budget Status */}
+        {remaining && budget && (
+          <Card style={styles.card}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Smart Daily Budget</Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+              Based on your 50-30-20 rule budget
+            </Text>
+
+            {/* Monthly Summary */}
+            <View style={[styles.monthlyBox, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}>
+              <View style={styles.monthlyBoxRow}>
+                <View style={styles.monthlyBoxCol}>
+                  <Text style={[styles.monthlyBoxLabel, { color: colors.textSecondary }]}>Monthly Limit</Text>
+                  <Text style={[styles.monthlyBoxValue, { color: colors.primary }]}>
+                    ₹{budget.monthlyLimit.toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={[styles.monthlyBoxCaption, { color: colors.textSecondary }]}>50% Needs + 30% Wants</Text>
+                </View>
+                <View style={styles.monthlyBoxCol}>
+                  <Text style={[styles.monthlyBoxLabel, { color: colors.textSecondary }]}>Already Spent</Text>
+                  <Text style={[styles.monthlyBoxValue, { color: colors.error }]}>
+                    ₹{remaining.monthlySpent.toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={[styles.monthlyBoxCaption, { color: colors.textSecondary }]}>from transactions</Text>
+                </View>
+                <View style={styles.monthlyBoxCol}>
+                  <Text style={[styles.monthlyBoxLabel, { color: colors.textSecondary }]}>Remaining</Text>
+                  <Text style={[styles.monthlyBoxValue, { color: remaining.monthlyRemaining >= 0 ? colors.success : colors.error }]}>
+                    ₹{remaining.monthlyRemaining.toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={[styles.monthlyBoxCaption, { color: colors.textSecondary }]}>this month</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Daily Suggestion */}
+            <View style={[styles.suggestionBox, { backgroundColor: colors.successLight }]}>
+              <Text style={[styles.suggestionTitle, { color: colors.success }]}>Daily Target</Text>
+              <Text style={[styles.suggestionValue, { color: colors.success }]}>
+                ₹{remaining.dailyRemaining.toLocaleString('en-IN')}/day
+              </Text>
+              <Text style={[styles.suggestionHint, { color: colors.textSecondary }]}>
+                to stay within your ₹{budget.monthlyLimit.toLocaleString('en-IN')} monthly limit
+              </Text>
+              <View style={styles.suggestionDetails}>
+                <Text style={[styles.suggestionDetail, { color: colors.textSecondary }]}>
+                  Today spent: ₹{remaining.dailySpent.toLocaleString('en-IN')}
                 </Text>
-                <Text style={[styles.budgetStatusSpent, { color: colors.textSecondary }]}>
-                  ₹{remaining.dailySpent.toLocaleString('en-IN')} spent
+                <Text style={[styles.suggestionDetail, { color: colors.textSecondary }]}>
+                  {remaining.dailySpent > remaining.dailyRemaining
+                    ? `Save ₹${(remaining.dailySpent - remaining.dailyRemaining).toLocaleString('en-IN')} on other days`
+                    : `Budget available: ₹${(remaining.dailyRemaining - remaining.dailySpent).toLocaleString('en-IN')}`}
                 </Text>
               </View>
+            </View>
 
-              {/* Week */}
-              <View style={styles.budgetStatusItem}>
-                <Text style={[styles.budgetStatusLabel, { color: colors.textSecondary }]}>This Week</Text>
-                <Text style={[styles.budgetStatusValue, { color: remaining.weeklyRemaining >= 0 ? colors.success : colors.error }]}>
+            {/* Weekly Status */}
+            <View style={[styles.statusGrid, { marginTop: 16 }]}>
+              <View style={[styles.statusCard, { borderColor: remaining.weeklyRemaining >= 0 ? colors.success : colors.error }]}>
+                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Weekly</Text>
+                <Text style={[styles.statusValue, { color: remaining.weeklyRemaining >= 0 ? colors.success : colors.error }]}>
                   ₹{remaining.weeklyRemaining.toLocaleString('en-IN')}
                 </Text>
-                <Text style={[styles.budgetStatusSpent, { color: colors.textSecondary }]}>
-                  ₹{remaining.weeklySpent.toLocaleString('en-IN')} spent
+                <Text style={[styles.statusDetail, { color: colors.textSecondary }]}>
+                  {remaining.weeklyRemaining >= 0 ? 'Remaining' : 'Overspent'}
                 </Text>
               </View>
 
-              {/* Month */}
-              <View style={styles.budgetStatusItem}>
-                <Text style={[styles.budgetStatusLabel, { color: colors.textSecondary }]}>This Month</Text>
-                <Text style={[styles.budgetStatusValue, { color: remaining.monthlyRemaining >= 0 ? colors.success : colors.error }]}>
-                  ₹{remaining.monthlyRemaining.toLocaleString('en-IN')}
+              <View style={[styles.statusCard, { borderColor: colors.primary }]}>
+                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>This Month</Text>
+                <Text style={[styles.statusValue, { color: colors.primary }]}>
+                  {((remaining.monthlySpent / (budget.monthlyLimit || 1)) * 100).toFixed(0)}%
                 </Text>
-                <Text style={[styles.budgetStatusSpent, { color: colors.textSecondary }]}>
-                  ₹{remaining.monthlySpent.toLocaleString('en-IN')} spent
+                <Text style={[styles.statusDetail, { color: colors.textSecondary }]}>
+                  of budget used
                 </Text>
               </View>
             </View>
@@ -203,7 +314,7 @@ export default function DashboardScreen() {
                     ₹{item.amount.toLocaleString('en-IN')}
                   </Text>
                   <Text style={[styles.categoryPercentage, { color: colors.textSecondary }]}>
-                    {item.percentage.toFixed(0)}%
+                    {item.percentage.toFixed(1)}%
                   </Text>
                 </View>
               ))}
@@ -239,12 +350,12 @@ export default function DashboardScreen() {
           </View>
         </Card>
 
-        {/* ⭐ BUDGET SECTION MERGED FROM budget.tsx ⭐ */}
+        {/* 50-30-20 Budget Rule */}
         {budget && (
           <Card style={styles.card}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>50-30-20 Budget Rule</Text>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
-              Based on your income of ₹{userProfile.monthlyIncome.toLocaleString('en-IN')}
+              Based on your income of ₹{monthlyIncome.toLocaleString('en-IN')}
             </Text>
 
             <View style={styles.chartContainer}>
@@ -318,12 +429,12 @@ export default function DashboardScreen() {
             </View>
           </Card>
         )}
-
       </View>
     </ScrollView>
   );
 }
 
+// ...existing styles (unchanged)...
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
@@ -343,11 +454,36 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
   cardSubtitle: { fontSize: 13, marginBottom: 16 },
 
+  projectionBox: { backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 12, padding: 16, marginBottom: 16 },
+  projectionLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
+  projectionValueLarge: { fontSize: 32, fontWeight: '700', marginBottom: 8 },
+  projectionHint: { fontSize: 12 },
+
   budgetStatusContainer: { flexDirection: 'row', gap: 12 },
   budgetStatusItem: { flex: 1, alignItems: 'center' },
   budgetStatusLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
   budgetStatusValue: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
   budgetStatusSpent: { fontSize: 11 },
+
+  monthlyBox: { borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1 },
+  monthlyBoxRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  monthlyBoxCol: { alignItems: 'center' },
+  monthlyBoxLabel: { fontSize: 12, fontWeight: '500', marginBottom: 4 },
+  monthlyBoxValue: { fontSize: 18, fontWeight: '700' },
+  monthlyBoxCaption: { fontSize: 10, marginTop: 4 },
+
+  suggestionBox: { borderRadius: 12, padding: 16, marginBottom: 16 },
+  suggestionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  suggestionValue: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  suggestionHint: { fontSize: 12, marginBottom: 12 },
+  suggestionDetails: { borderTopWidth: 1, borderTopColor: '#0001', paddingTop: 12 },
+  suggestionDetail: { fontSize: 12, fontWeight: '500', marginTop: 4 },
+
+  statusGrid: { flexDirection: 'row', gap: 12 },
+  statusCard: { flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, alignItems: 'center' },
+  statusLabel: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  statusValue: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
+  statusDetail: { fontSize: 11 },
 
   chartContainer: { alignItems: 'center', marginVertical: 16 },
 

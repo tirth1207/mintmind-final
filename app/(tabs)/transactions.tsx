@@ -38,8 +38,14 @@ const INCOME_CATEGORIES: IncomeCategory[] = [
 ];
 
 export default function TransactionsScreen() {
-  const { transactions, addTransaction, deleteTransaction, monthlyIncome, monthlyExpenses } =
-    useTransactions();
+  const { 
+    transactions, 
+    addTransaction, 
+    deleteTransaction, 
+    monthlyIncome, 
+    monthlyExpenses,
+    getRemainingBudget 
+  } = useTransactions();
   const { settings } = useAppState();
   const colors = Colors[settings.theme];
 

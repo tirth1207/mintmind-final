@@ -1,17 +1,27 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import createContextHook from '@nkzw/create-context-hook';
-import { useState, useEffect, useMemo } from 'react';
-import { Transaction, TransactionType, ExpenseCategory, IncomeCategory } from '@/types';
 import {
-  getMonthlyTransactions,
-  getTotalExpenses,
-  getTotalIncome,
   getCategoryBreakdown,
   getDailyExpenses,
-  calculateRemainingBudget,
+  getMonthlyTransactions,
+  getTotalExpenses,
+  getTotalIncome
 } from '@/lib/finance/transactions';
+import { ExpenseCategory, IncomeCategory, Transaction, TransactionType } from '@/types';
+import createContextHook from '@nkzw/create-context-hook';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useMemo, useState } from 'react';
 
 const STORAGE_KEY = 'transactions';
+
+interface BudgetStatus {
+  dailySpent: number;
+  weeklySpent: number;
+  monthlySpent: number;
+  dailyRemaining: number;
+  weeklyRemaining: number;
+  monthlyRemaining: number;
+  burnRate: number; // avg daily expense
+  projectedMonthEnd: number; // projected balance at month end
+}
 
 export const [TransactionProvider, useTransactions] = createContextHook(() => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -107,6 +117,97 @@ export const [TransactionProvider, useTransactions] = createContextHook(() => {
     [monthlyTransactions]
   );
 
+  const remainingMonthlyBudget = useMemo(
+    () => monthlyIncome - monthlyExpenses,
+    [monthlyIncome, monthlyExpenses]
+  );
+
+  // ...existing code...
+
+  // 🆕 COMPUTE BURN RATE (avg daily expense for current month)
+  const burnRate = useMemo(() => {
+    if (monthlyTransactions.length === 0) return 0;
+    
+    const now = new Date();
+    const daysIntoMonth = now.getDate();
+    const dailyAverage = monthlyExpenses / daysIntoMonth;
+    
+    return Math.round(dailyAverage * 100) / 100; // 2 decimals
+  }, [monthlyExpenses, monthlyTransactions]);
+
+  // 🆕 PROJECT MONTH-END BALANCE
+  const projectedMonthEnd = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDaysInMonth = daysInMonth - now.getDate();
+    
+    const projectedRemainingExpense = burnRate * remainingDaysInMonth;
+    const projected = remainingMonthlyBudget - projectedRemainingExpense;
+    
+    return Math.round(projected);
+  }, [burnRate, remainingMonthlyBudget]);
+
+  // 🆕 INTERNAL BUDGET STATUS (moved from separate hook)
+  const budgetStatus = useMemo((): BudgetStatus => {
+    const today = new Date();
+    const weekStart = new Date();
+    weekStart.setDate(today.getDate() - today.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const isSameDay = (a: string, b: Date) =>
+      new Date(a).toDateString() === b.toDateString();
+
+    const dailySpent = transactions
+      .filter((t) => t.type === 'expense' && isSameDay(t.date, today))
+      .reduce((s, t) => s + t.amount, 0);
+
+    const weeklySpent = transactions
+      .filter((t) => t.type === 'expense' && new Date(t.date) >= weekStart)
+      .reduce((s, t) => s + t.amount, 0);
+
+    const monthlySpent = monthlyExpenses; // Already computed above
+
+    return {
+      dailySpent: Math.round(dailySpent * 100) / 100,
+      weeklySpent: Math.round(weeklySpent * 100) / 100,
+      monthlySpent: Math.round(monthlySpent * 100) / 100,
+      dailyRemaining: 0, // will be set by caller with dailyLimit
+      weeklyRemaining: 0,
+      monthlyRemaining: 0,
+      burnRate,
+      projectedMonthEnd,
+    };
+  }, [transactions, monthlyExpenses, burnRate, projectedMonthEnd]);
+
+  // 🆕 EXPORTED FUNCTION - SMARTER BUDGET CALCULATION
+  // Suggests daily savings needed to match monthly budget even if overspent today
+  function getRemainingBudget(
+    dailyLimit: number,
+    weeklyLimit: number,
+    monthlyLimit: number
+  ): BudgetStatus {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDaysInMonth = daysInMonth - now.getDate();
+    
+    // Smart daily remaining: budget needs to be spread across remaining days
+    // If you overspent today, you need to save more on other days
+    const budgetRemainingForMonth = monthlyLimit - budgetStatus.monthlySpent;
+    const suggestedDailyBudgetForRemaining = remainingDaysInMonth > 0 
+      ? Math.round((budgetRemainingForMonth / remainingDaysInMonth) * 100) / 100
+      : 0;
+
+    return {
+      ...budgetStatus,
+      dailyRemaining: Math.max(0, suggestedDailyBudgetForRemaining),
+      weeklyRemaining: Math.round((weeklyLimit - budgetStatus.weeklySpent) * 100) / 100,
+      monthlyRemaining: Math.round((monthlyLimit - budgetStatus.monthlySpent) * 100) / 100,
+    };
+  }
+
   return {
     transactions,
     isLoading,
@@ -118,14 +219,12 @@ export const [TransactionProvider, useTransactions] = createContextHook(() => {
     monthlyExpenses,
     expenseCategoryBreakdown,
     dailyExpenseData,
+    remainingMonthlyBudget,
+    burnRate,
+    projectedMonthEnd,
+    budgetStatus,
+    getRemainingBudget, // 🆕 NEW METHOD
   };
 });
 
-export function useRemainingBudget(dailyLimit: number, weeklyLimit: number, monthlyLimit: number) {
-  const { transactions } = useTransactions();
-  
-  return useMemo(
-    () => calculateRemainingBudget(dailyLimit, weeklyLimit, monthlyLimit, transactions),
-    [transactions, dailyLimit, weeklyLimit, monthlyLimit]
-  );
-}
+// ❌ REMOVE THE OLD useRemainingBudget FUNCTION

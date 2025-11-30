@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useAppState } from '@/store/AppStateProvider';
+import { useTransactions } from '@/store/TransactionProvider';
 import { Card } from '@/components/Card';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
@@ -10,29 +11,37 @@ import Colors from '@/constants/colors';
 import { calculateSIP } from '@/lib/finance/sip';
 
 export default function SIPCalculatorScreen() {
-  const { settings } = useAppState();
+  const { settings, recommendedSIP, userProfile, budget } = useAppState();
+  const { monthlyIncome, monthlyExpenses } = useTransactions();
   const colors = Colors[settings.theme];
 
-  const [monthlyInvestment, setMonthlyInvestment] = useState('10000');
+  // 🆕 Use planned income/expenses for surplus (from onboarding)
+  // These are more reliable than transaction-based values which start at 0
+  const plannedSurplus = userProfile.monthlyIncome - userProfile.monthlyExpenses;
+  const defaultMonthlyInvestment = recommendedSIP > 0 ? recommendedSIP : (budget?.savings || Math.round(plannedSurplus * 0.35));
+
+  const [monthlyInvestment, setMonthlyInvestment] = useState(defaultMonthlyInvestment.toString());
   const [expectedReturn, setExpectedReturn] = useState('12');
   const [years, setYears] = useState('10');
-  const [result, setResult] = useState(calculateSIP(10000, 12, 10));
 
-  const handleCalculate = () => {
+  const result = useMemo(() => {
     const investment = parseFloat(monthlyInvestment) || 0;
     const returns = parseFloat(expectedReturn) || 0;
     const timeYears = parseFloat(years) || 0;
 
     if (investment > 0 && returns > 0 && timeYears > 0) {
-      const sipResult = calculateSIP(investment, returns, timeYears);
-      setResult(sipResult);
+      return calculateSIP(investment, returns, timeYears);
     }
-  };
 
-  const chartData = result.yearlyBreakdown.filter((_, index) => index % Math.ceil(result.yearlyBreakdown.length / 6) === 0 || index === result.yearlyBreakdown.length - 1).map((item) => ({
-    label: `Y${item.year}`,
-    value: item.total,
-  }));
+    return calculateSIP(defaultMonthlyInvestment, 12, 10);
+  }, [monthlyInvestment, expectedReturn, years, defaultMonthlyInvestment]);
+
+  const chartData = result.yearlyBreakdown
+    .filter((_, index) => index % Math.ceil(result.yearlyBreakdown.length / 6) === 0 || index === result.yearlyBreakdown.length - 1)
+    .map((item) => ({
+      label: `Y${item.year}`,
+      value: item.total,
+    }));
 
   const pieData = [
     { label: 'Invested', value: result.totalInvested, color: colors.chart1 },
@@ -52,7 +61,7 @@ export default function SIPCalculatorScreen() {
             label="Monthly Investment"
             value={monthlyInvestment}
             onChangeText={setMonthlyInvestment}
-            placeholder="10000"
+            placeholder={defaultMonthlyInvestment.toString()}
             keyboardType="numeric"
             prefix="₹"
           />
@@ -75,7 +84,11 @@ export default function SIPCalculatorScreen() {
             suffix="years"
           />
 
-          <Button title="Calculate" onPress={handleCalculate} />
+          {(recommendedSIP > 0 || plannedSurplus > 0) && (
+            <Text style={[styles.hintText, { color: colors.textSecondary }]}>
+              💡 Recommended: ₹{(recommendedSIP > 0 ? recommendedSIP : (budget?.savings || 0)).toLocaleString('en-IN')}/month {recommendedSIP > 0 ? 'based on surplus' : 'based on 20% savings'}
+            </Text>
+          )}
         </Card>
 
         <Card style={styles.card}>
@@ -146,6 +159,11 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 14,
     marginBottom: 20,
+  },
+  hintText: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    marginTop: 12,
   },
   resultContainer: {
     gap: 16,
