@@ -1,0 +1,48 @@
+const light = {
+  primary: '#10B981',
+  secondary: '#3B82F6',
+  accent: '#8B5CF6',
+  background: '#FFFFFF',
+  surface: '#F9FAFB',
+  card: '#FFFFFF',
+  text: '#111827',
+  textSecondary: '#6B7280',
+  border: '#E5E7EB',
+  success: '#10B981',
+  successLight: '#D1FAE5',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  errorLight: '#FEE2E2',
+  chart1: '#3B82F6',
+  chart2: '#10B981',
+  chart3: '#F59E0B',
+  chart4: '#8B5CF6',
+  overlay: 'rgba(0, 0, 0, 0.5)',
+};
+
+const dark = {
+  primary: '#10B981',
+  secondary: '#3B82F6',
+  accent: '#A78BFA',
+  background: '#111827',
+  surface: '#1F2937',
+  card: '#1F2937',
+  text: '#F9FAFB',
+  textSecondary: '#9CA3AF',
+  border: '#374151',
+  success: '#10B981',
+  successLight: '#064E3B',
+  warning: '#FBBF24',
+  error: '#F87171',
+  errorLight: '#7F1D1D',
+  chart1: '#60A5FA',
+  chart2: '#34D399',
+  chart3: '#FBBF24',
+  chart4: '#A78BFA',
+  overlay: 'rgba(0, 0, 0, 0.7)',
+};
+
+export default {
+  light,
+  dark,
+};
